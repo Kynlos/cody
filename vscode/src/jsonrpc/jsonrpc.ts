@@ -317,6 +317,7 @@ export class MessageHandler {
                 return
             }
 
+            console.error(`#### received message ${msg.id}:${msg.method}}`)
             if (msg.id !== undefined && msg.method) {
                 if (typeof msg.id === 'number' && msg.id > this.id) {
                     this.id = msg.id + 1
@@ -407,7 +408,7 @@ export class MessageHandler {
                             )
                         }
                     } else {
-                        console.error(`No handler for notification with method ${msg.method}`)
+                        console.error(`No asdf handler for notification with method ${msg.method}`)
                     }
                 }
             }

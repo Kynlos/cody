@@ -763,6 +763,7 @@ export class Agent extends MessageHandler {
         this.registerAuthenticatedRequest('chat/submitMessage', submitOrEditHandler)
         this.registerAuthenticatedRequest('chat/editMessage', submitOrEditHandler)
 
+        console.error('### registering webview/receiveMessage')
         this.registerAuthenticatedRequest('webview/receiveMessage', async ({ id, message }) => {
             await this.receiveWebviewMessage(id, message)
             return null

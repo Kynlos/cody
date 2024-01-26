@@ -317,7 +317,7 @@ export class MessageHandler {
                 return
             }
 
-            console.error(`#### received message ${msg.id}:${msg.method}}`)
+            console.error(`#### received message ${msg.id}:${msg.method}:${JSON.stringify(msg)}`)
             if (msg.id !== undefined && msg.method) {
                 if (typeof msg.id === 'number' && msg.id > this.id) {
                     this.id = msg.id + 1

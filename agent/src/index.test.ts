@@ -909,7 +909,7 @@ describe('Agent', () => {
                     names: ['github.com/sourcegraph/sourcegraph'],
                     first: 1,
                 })
-                await enterpriseClient.request('webview/receiveMessage', {
+                await enterpriseClient.notify('webview/receiveMessage', {
                     id,
                     message: { command: 'context/choose-remote-search-repo', explicitRepos: repos },
                 })

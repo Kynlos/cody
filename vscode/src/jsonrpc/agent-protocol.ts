@@ -101,11 +101,6 @@ export type Requests = {
     // webview ID (from chat/new).
     'webview/didDispose': [{ id: string }, null]
 
-    // Low-level API to send a raw WebviewMessage from a specific webview (chat
-    // session).  Refrain from using this API in favor of high-level APIs like
-    // `chat/submitMessage`.
-    'webview/receiveMessage': [{ id: string; message: WebviewMessage }, null]
-
     // Only used for testing purposes. If you want to write an integration test
     // for dealing with progress bars then you can send a request to this
     // endpoint to emulate the scenario where the server creates a progress bar.
@@ -208,6 +203,19 @@ export type Notifications = {
     // chat/new). Subscribe to these messages to get access to streaming updates
     // on the chat reply.
     'webview/postMessage': [WebviewPostMessageParams]
+
+    // Low-level API to send a raw WebviewMessage from a specific webview (chat
+    // session).  Refrain from using this API in favor of high-level APIs like
+    // `chat/submitMessage`.
+    'webview/receiveMessage': [
+        {
+            // The chat panel ID
+            id: string
+
+            message: WebviewMessage
+        },
+        null,
+    ]
 
     'progress/start': [ProgressStartParams]
 

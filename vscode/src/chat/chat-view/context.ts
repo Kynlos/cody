@@ -1,4 +1,5 @@
 import * as vscode from 'vscode'
+import * as path from 'path'
 
 import {
     isCodyIgnoredFile,
@@ -24,8 +25,117 @@ import type { CachedRemoteEmbeddingsClient } from '../CachedRemoteEmbeddingsClie
 import { viewRangeToRange } from './chat-helpers'
 import type { CodebaseStatusProvider } from './CodebaseStatusProvider'
 import type { ContextItem } from './SimpleChatModel'
+import fs from 'fs';
 
 const isAgentTesting = process.env.CODY_SHIM_TESTING === 'true'
+
+// todo:
+/*
+** context source ** 
+1. search - 
+2. embeddings - 
+3. editor
+    - visible editor - selection content
+*/
+
+
+
+export async function logAllEnhancedContextItems(
+    useContextConfig: ConfigurationUseContext,
+    editor: VSCodeEditor,
+    embeddingsClient: CachedRemoteEmbeddingsClient,
+    localEmbeddings: LocalEmbeddingsController | null,
+    symf: SymfRunner | null,
+    codebaseStatusProvider: CodebaseStatusProvider,
+    text: string
+): Promise<void> {
+    const searchContext: ContextItem[] = []
+    logDebug('SimpleChatPanelProvider', 'getEnhancedContext > none')
+
+    let hasEmbeddingsContext = false
+
+    logDebug('SimpleChatPanelProvider', 'getEnhancedContext > embeddings (start)')
+    const localEmbeddingsResults = searchEmbeddingsLocal(localEmbeddings, text)
+    const remoteEmbeddingsResults = searchEmbeddingsRemote(
+        embeddingsClient,
+        codebaseStatusProvider,
+        text
+    )
+    try {
+        const r = await localEmbeddingsResults
+        hasEmbeddingsContext = hasEmbeddingsContext || r.length > 0
+        searchContext.push(...r)
+    } catch (error) {
+        logDebug('SimpleChatPanelProvider', 'getEnhancedContext > local embeddings', error)
+    }
+    try {
+        const r = await remoteEmbeddingsResults
+        hasEmbeddingsContext = hasEmbeddingsContext || r.length > 0
+        searchContext.push(...r)
+    } catch (error) {
+        logDebug('SimpleChatPanelProvider', 'getEnhancedContext > remote embeddings', error)
+    }
+    logDebug('SimpleChatPanelProvider', 'getEnhancedContext > embeddings (end)')
+    
+    // Fallback to symf if embeddings provided no results or if useContext is set to 'keyword' specifically
+    if (symf) {
+        logDebug('SimpleChatPanelProvider', 'getEnhancedContext > search')
+        try {
+            searchContext.push(...(await searchSymf(symf, editor, text)))
+        } catch (error) {
+            // TODO(beyang): handle this error better
+            logDebug('SimpleChatPanelProvider.getEnhancedContext', 'searchSymf error', error)
+        }
+    }
+
+    const priorityContext: ContextItem[] = []
+    const selectionContext = getCurrentSelectionContext(editor)
+    if (selectionContext.length > 0) {
+        priorityContext.push(...selectionContext)
+    } 
+    // Query refers to current editor
+    priorityContext.push(...getVisibleEditorContext(editor))
+   
+    // Query refers to project, so include the README
+    let containsREADME = false
+    for (const contextItem of searchContext) {
+        const basename = uriBasename(contextItem.uri)
+        if (
+            basename.toLocaleLowerCase() === 'readme' ||
+            basename.toLocaleLowerCase().startsWith('readme.')
+        ) {
+            containsREADME = true
+            break
+        }
+    }
+    if (!containsREADME) {
+        priorityContext.push(...(await getReadmeContext()))
+    }
+    const allContext: ContextItem[] = priorityContext.concat(searchContext)
+    const currentCodebaseContext = await codebaseStatusProvider.currentCodebase()
+    if(currentCodebaseContext===null){
+        logDebug('[Hitesh Custom]: current codebase is not defined ', JSON.stringify(codebaseStatusProvider))
+        return
+    }
+    const currentCodebasePath = currentCodebaseContext.localFolder.path
+    if(currentCodebasePath==undefined) {
+        logDebug('[Hitesh Custom]: Codebase path is not defined, codebaseStatusProvider is ', JSON.stringify(codebaseStatusProvider))
+        return
+    }
+    const codebasePath = path.join(currentCodebasePath, "context-candidates.jsonl");
+
+    const logObj = {
+        logUnixTimestamp: new Date().valueOf(),
+        repoPath: codebasePath,
+        question: text,
+        contextCandidates: allContext,
+    }
+    if (!fs.existsSync(codebasePath)) {
+        fs.writeFileSync(codebasePath, JSON.stringify(logObj)+'\n');
+    } else {
+        fs.appendFileSync(codebasePath, JSON.stringify(logObj)+'\n');
+    }
+}
 
 export async function getEnhancedContext(
     useContextConfig: ConfigurationUseContext,
@@ -36,6 +146,16 @@ export async function getEnhancedContext(
     codebaseStatusProvider: CodebaseStatusProvider,
     text: string
 ): Promise<ContextItem[]> {
+    await logAllEnhancedContextItems(
+        useContextConfig,
+        editor,
+        embeddingsClient,
+        localEmbeddings,
+        symf,
+        codebaseStatusProvider,
+        text
+    );
+
     const searchContext: ContextItem[] = []
 
     // use user attention context only if config is set to none
@@ -401,31 +521,33 @@ function needsReadmeContext(editor: VSCodeEditor, input: string): boolean {
 
     return containsQuestionIndicator && containsProjectSignifier
 }
+
 async function getReadmeContext(): Promise<ContextItem[]> {
     // global pattern for readme file
     const readmeGlobalPattern = '{README,README.,readme.,Readm.}*'
-    const readmeUri = (await vscode.workspace.findFiles(readmeGlobalPattern, undefined, 1)).at(0)
-    if (!readmeUri || isCodyIgnoredFile(readmeUri)) {
-        return []
-    }
-    const readmeDoc = await vscode.workspace.openTextDocument(readmeUri)
-    const readmeText = readmeDoc.getText()
-    const { truncated: truncatedReadmeText, range } = truncateTextNearestLine(
-        readmeText,
-        MAX_BYTES_PER_FILE
-    )
-    if (truncatedReadmeText.length === 0) {
-        return []
-    }
-
-    return [
-        {
+    const allReadmeUri = (await vscode.workspace.findFiles(readmeGlobalPattern, undefined, 1000))
+    const results: ContextItem[] = []
+    for(const readmeUri of allReadmeUri) {
+        if (!readmeUri || isCodyIgnoredFile(readmeUri)) {
+            return []
+        }
+        const readmeDoc = await vscode.workspace.openTextDocument(readmeUri)
+        const readmeText = readmeDoc.getText()
+        const { truncated: truncatedReadmeText, range } = truncateTextNearestLine(
+            readmeText,
+            MAX_BYTES_PER_FILE
+        )
+        if (truncatedReadmeText.length === 0) {
+            return []
+        }
+        results.push({
             uri: readmeUri,
             text: truncatedReadmeText,
             range: viewRangeToRange(range),
             source: 'editor',
-        },
-    ]
+        })
+    }
+    return results
 }
 
 export async function getCommandContext(

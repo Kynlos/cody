@@ -134,8 +134,14 @@ export const jsonrpcCommand = new Command('jsonrpc')
         // workflows. We manually confirmed that this logic makes the agent exit even
         // when we forcefully quit IntelliJ
         // https://github.com/sourcegraph/cody/pull/1439#discussion_r1365610354
-        process.stdout.on('close', () => process.exit(1))
-        process.stdin.on('close', () => process.exit(1))
+        process.stdout.on('close', () => {
+            console.log(`agent: error on exit stdout close`)
+            process.exit(1)
+        })
+        process.stdin.on('close', () => {
+            console.log(`agent: error on exit stdin close`)
+            process.exit(1)
+        })
 
         process.stdin.pipe(agent.messageDecoder)
         agent.messageEncoder.pipe(process.stdout)

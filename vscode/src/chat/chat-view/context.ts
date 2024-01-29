@@ -122,19 +122,27 @@ export async function logAllEnhancedContextItems(
         logDebug('[Hitesh Custom]: Codebase path is not defined, codebaseStatusProvider is ', JSON.stringify(codebaseStatusProvider))
         return
     }
-    const codebasePath = path.join(currentCodebasePath, "context-candidates.jsonl");
+    const repoName = currentCodebasePath.split('/').at(-1)
+    if(repoName===undefined){
+        logDebug('[Hitesh Custom]: unable to parse repo name ', JSON.stringify(currentCodebasePath), ' repo name: ', repoName)
+        return
+    }
+    const codebasePath = path.join('/home/hiteshsagtani/dev/e2e-chat-evaluation-workspace/context-ranking-datalogs', `${repoName}-context-candidates.jsonl`);
 
     const logObj = {
         logUnixTimestamp: new Date().valueOf(),
-        repoPath: codebasePath,
+        repoPath: repoName,
         question: text,
         contextCandidates: allContext,
     }
+    
     if (!fs.existsSync(codebasePath)) {
         fs.writeFileSync(codebasePath, JSON.stringify(logObj)+'\n');
     } else {
         fs.appendFileSync(codebasePath, JSON.stringify(logObj)+'\n');
     }
+    logDebug('[Hitesh Custom] Context logging ', '-------- --------- -------- ---------', 
+    'context sourceslogging complete for workspace', codebasePath, '-------- --------- -------- ---------')
 }
 
 export async function getEnhancedContext(

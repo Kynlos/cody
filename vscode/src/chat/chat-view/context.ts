@@ -1,5 +1,4 @@
 import * as vscode from 'vscode'
-import * as path from 'path'
 
 import {
     isCodyIgnoredFile,
@@ -25,8 +24,6 @@ import type { CachedRemoteEmbeddingsClient } from '../CachedRemoteEmbeddingsClie
 import { viewRangeToRange } from './chat-helpers'
 import type { CodebaseStatusProvider } from './CodebaseStatusProvider'
 import type { ContextItem } from './SimpleChatModel'
-import fs from 'fs';
-
 const isAgentTesting = process.env.CODY_SHIM_TESTING === 'true'
 
 // todo:
@@ -127,22 +124,13 @@ export async function logAllEnhancedContextItems(
         logDebug('[Hitesh Custom]: unable to parse repo name ', JSON.stringify(currentCodebasePath), ' repo name: ', repoName)
         return
     }
-    const codebasePath = path.join('/home/hiteshsagtani/dev/e2e-chat-evaluation-workspace/context-ranking-datalogs', `${repoName}-context-candidates.jsonl`);
-
     const logObj = {
         logUnixTimestamp: new Date().valueOf(),
         repoPath: repoName,
         question: text,
         contextCandidates: allContext,
     }
-    
-    if (!fs.existsSync(codebasePath)) {
-        fs.writeFileSync(codebasePath, JSON.stringify(logObj)+'\n');
-    } else {
-        fs.appendFileSync(codebasePath, JSON.stringify(logObj)+'\n');
-    }
-    logDebug('[Hitesh Custom] Context logging ', '-------- --------- -------- ---------', 
-    'context sourceslogging complete for workspace', codebasePath, '-------- --------- -------- ---------')
+    logDebug('EnhancedContextAllContext', JSON.stringify(logObj))
 }
 
 export async function getEnhancedContext(

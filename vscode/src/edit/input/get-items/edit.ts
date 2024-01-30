@@ -1,7 +1,6 @@
 import * as vscode from 'vscode'
 import type { GetItemsResult } from '../quick-pick'
 import { getItemLabel } from '../utils'
-import { EDIT_CHANGE_MODEL_ENABLED } from '../constants'
 
 export const RANGE_ITEM: vscode.QuickPickItem = {
     label: 'Range',
@@ -43,7 +42,7 @@ export const getEditInputItems = (
             kind: vscode.QuickPickItemKind.Separator,
         },
         { ...RANGE_ITEM, detail: getItemLabel(activeRangeItem) },
-        EDIT_CHANGE_MODEL_ENABLED ? { ...MODEL_ITEM, detail: getItemLabel(activeModelItem) } : null,
+        { ...MODEL_ITEM, detail: getItemLabel(activeModelItem) },
         {
             label: 'edit commands',
             kind: vscode.QuickPickItemKind.Separator,
